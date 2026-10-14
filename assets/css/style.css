@@ -71,6 +71,7 @@
 html {
   scroll-behavior: smooth;
   font-size: 16px;
+  overflow-x: hidden;
 }
 
 body {
@@ -126,13 +127,16 @@ textarea {
 /* Animação de Scroll Reveal */
 .reveal-up {
   opacity: 0;
-  transform: translateY(24px);
-  transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
 }
 
-.reveal-up.visible {
-  opacity: 1;
-  transform: translateY(0);
+/* O Hero e elementos com classe visible ficam 100% visíveis */
+.reveal-up.visible,
+.hero-section .reveal-up {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
 }
 
 /* Tipografia & Tags */

@@ -54,10 +54,24 @@ function initNavbar() {
 }
 
 /* ==========================================================================
-   2. ANIMAÇÃO DE SCROLL REVEAL SUAVE
+   2. ANIMAÇÃO DE SCROLL REVEAL SUAVE & SEGURO
    ========================================================================== */
 function initScrollReveal() {
   const revealElements = document.querySelectorAll('.reveal-up');
+
+  // Ativa imediatamente elementos que já estão no campo de visão (incluindo o hero)
+  const activateVisibleElements = () => {
+    const vh = window.innerHeight || document.documentElement.clientHeight || 800;
+    revealElements.forEach(el => {
+      const rect = el.getBoundingClientRect();
+      if (rect.top <= vh + 60) {
+        el.classList.add('visible');
+      }
+    });
+  };
+
+  activateVisibleElements();
+
   if (!('IntersectionObserver' in window)) {
     revealElements.forEach(el => el.classList.add('visible'));
     return;
@@ -70,9 +84,20 @@ function initScrollReveal() {
         observer.unobserve(entry.target);
       }
     });
-  }, { threshold: 0.12 });
+  }, { threshold: 0.05, rootMargin: '0px 0px 60px 0px' });
 
-  revealElements.forEach(el => observer.observe(el));
+  revealElements.forEach(el => {
+    if (!el.classList.contains('visible')) {
+      observer.observe(el);
+    }
+  });
+
+  // Fallback de segurança contra qualquer atraso ou bug de viewport no celular
+  setTimeout(() => {
+    document.querySelectorAll('.reveal-up:not(.visible)').forEach(el => {
+      el.classList.add('visible');
+    });
+  }, 1200);
 }
 
 /* ==========================================================================
