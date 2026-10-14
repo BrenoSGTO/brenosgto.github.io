@@ -244,7 +244,8 @@ function initGiftsModal() {
   giftButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       const card = btn.closest('.gift-card');
-      const icon = card ? card.querySelector('.gift-icon').innerText : '🎁';
+      const thumbImg = card ? card.querySelector('.gift-thumb-img') : null;
+      const iconEl = card ? card.querySelector('.gift-icon') : null;
       const title = card ? card.querySelector('.gift-title').innerText : 'Presente de Casamento';
       const rawPriceAttr = card ? card.getAttribute('data-price') : null;
 
@@ -268,7 +269,15 @@ function initGiftsModal() {
       // Gera o código PIX Copia e Cola Oficial (EMV) com o valor do presente
       currentPixPayload = generatePixCopyPaste(numericAmount);
 
-      if (modalGiftIcon) modalGiftIcon.innerText = icon;
+      if (modalGiftIcon) {
+        if (thumbImg) {
+          modalGiftIcon.innerHTML = `<img src="${thumbImg.src}" alt="${title}" class="gift-thumb-img">`;
+        } else if (iconEl) {
+          modalGiftIcon.innerHTML = iconEl.innerHTML;
+        } else {
+          modalGiftIcon.innerHTML = '🎁';
+        }
+      }
       if (modalGiftTitle) modalGiftTitle.innerText = title;
       if (modalGiftValue) modalGiftValue.innerText = displayPrice;
       if (pixKeyDisplay) pixKeyDisplay.innerText = currentPixPayload;
