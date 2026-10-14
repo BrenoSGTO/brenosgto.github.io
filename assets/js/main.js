@@ -1,15 +1,27 @@
 /**
  * Wedding Website Scripts
- * Breno & Mariana - Casamento
+ * Maria Helena & Breno — Casamento 2027
  */
 
 document.addEventListener('DOMContentLoaded', () => {
   initNavbar();
+  initScrollReveal();
   initCountdown();
+  initGiftFilters();
   initGiftsModal();
   initRSVPForm();
   initGuestbook();
 });
+
+/* ==========================================================================
+   CONFIGURAÇÕES DO PIX & WHATSAPP DO CASAL
+   ========================================================================== */
+const PIX_KEY_RAW = "13997766522";
+const PIX_KEY_BR = "+5513997766522"; // Formato E.164 exigido pelo padrão EMV do Banco Central para chave celular
+const PIX_KEY_FORMATTED = "(13) 99776-6522";
+const PIX_MERCHANT_NAME = "BRENO";
+const PIX_MERCHANT_CITY = "FLORIANOPOLIS";
+const WHATSAPP_PHONE = "5513997766522";
 
 /* ==========================================================================
    1. NAVBAR & MENU MOBILE
@@ -20,7 +32,6 @@ function initNavbar() {
   const navLinks = document.querySelector('.nav-links');
   const links = document.querySelectorAll('.nav-link, .nav-cta-btn');
 
-  // Sticky header on scroll
   window.addEventListener('scroll', () => {
     if (window.scrollY > 40) {
       header.classList.add('scrolled');
@@ -29,13 +40,11 @@ function initNavbar() {
     }
   });
 
-  // Mobile menu toggle
   if (toggleBtn && navLinks) {
     toggleBtn.addEventListener('click', () => {
       navLinks.classList.toggle('active');
     });
 
-    // Fechar ao clicar em qualquer link
     links.forEach(link => {
       link.addEventListener('click', () => {
         navLinks.classList.remove('active');
@@ -45,10 +54,31 @@ function initNavbar() {
 }
 
 /* ==========================================================================
-   2. CONTAGEM REGRESSIVA (COUNTDOWN)
+   2. ANIMAÇÃO DE SCROLL REVEAL SUAVE
+   ========================================================================== */
+function initScrollReveal() {
+  const revealElements = document.querySelectorAll('.reveal-up');
+  if (!('IntersectionObserver' in window)) {
+    revealElements.forEach(el => el.classList.add('visible'));
+    return;
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12 });
+
+  revealElements.forEach(el => observer.observe(el));
+}
+
+/* ==========================================================================
+   3. CONTAGEM REGRESSIVA (COUNTDOWN)
    ========================================================================== */
 function initCountdown() {
-  // Data configurada para o casamento: 20 de Novembro de 2027 às 16:30
   const weddingDate = new Date('2027-11-20T16:30:00').getTime();
 
   const daysEl = document.getElementById('cd-days');
@@ -86,46 +116,146 @@ function initCountdown() {
 }
 
 /* ==========================================================================
-   3. MODAL DE PRESENTES & PIX
+   4. FILTROS DA LISTA DE PRESENTES
    ========================================================================== */
-// Configurações do PIX e WhatsApp do Casal
-const PIX_KEY_RAW = "13997766522";
-const PIX_KEY_FORMATTED = "(13) 99776-6522";
-const WHATSAPP_PHONE = "5513997766522";
+function initGiftFilters() {
+  const filterBtns = document.querySelectorAll('.gift-filter-btn');
+  const giftCards = document.querySelectorAll('.gift-card');
+
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const selectedCategory = btn.getAttribute('data-filter');
+
+      giftCards.forEach(card => {
+        const cardCat = card.getAttribute('data-category');
+        if (selectedCategory === 'all' || cardCat === selectedCategory) {
+          card.classList.remove('hidden-card');
+        } else {
+          card.classList.add('hidden-card');
+        }
+      });
+    });
+  });
+}
+
+/* ==========================================================================
+   5. GERADOR DE PIX COPIA E COLA (EMV BR CODE BACEN) & MODAL DE PRESENTES
+   ========================================================================== */
+function formatEMVField(id, value) {
+  const len = String(value.length).padStart(2, '0');
+  return `${id}${len}${value}`;
+}
+
+function calculateCRC16(payload) {
+  let crc = 0xFFFF;
+  for (let i = 0; i < payload.length; i++) {
+    crc ^= payload.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      if ((crc & 0x8000) !== 0) {
+        crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
+      } else {
+        crc = (crc << 1) & 0xFFFF;
+      }
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+
+function generatePixCopyPaste(amountNumber) {
+  const gui = formatEMVField('00', 'br.gov.bcb.pix');
+  const key = formatEMVField('01', PIX_KEY_BR);
+  const merchantAccountInfo = formatEMVField('26', gui + key);
+
+  let payload =
+    formatEMVField('00', '01') + // Payload Format Indicator
+    merchantAccountInfo +
+    formatEMVField('52', '0000') + // Merchant Category Code
+    formatEMVField('53', '986');   // Moeda (986 = Real Brasileiro)
+
+  if (amountNumber && !isNaN(amountNumber) && amountNumber > 0) {
+    payload += formatEMVField('54', Number(amountNumber).toFixed(2));
+  }
+
+  payload +=
+    formatEMVField('58', 'BR') +
+    formatEMVField('59', PIX_MERCHANT_NAME) +
+    formatEMVField('60', PIX_MERCHANT_CITY) +
+    formatEMVField('62', formatEMVField('05', 'CASAMENTOMB')) +
+    '6304';
+
+  const crc = calculateCRC16(payload);
+  return payload + crc;
+}
 
 function initGiftsModal() {
   const modal = document.getElementById('pix-modal');
   const modalClose = document.getElementById('pix-modal-close');
   const giftButtons = document.querySelectorAll('.btn-gift-action');
-  
+  const directPixBtn = document.getElementById('copy-direct-pix-btn');
+
+  const modalGiftIcon = document.getElementById('modal-gift-icon');
   const modalGiftTitle = document.getElementById('modal-gift-name');
   const modalGiftValue = document.getElementById('modal-gift-val');
   const pixKeyDisplay = document.getElementById('pix-key-display');
-  const copyPixBtn = document.getElementById('copy-pix-btn');
+  const copyPayloadBtn = document.getElementById('copy-pix-payload-btn');
+  const copyPhoneBtn = document.getElementById('copy-pix-phone-btn');
   const pixQrImage = document.getElementById('pix-qr-img');
   const notifyWhatsBtn = document.getElementById('notify-pix-whats');
 
+  let currentPixPayload = PIX_KEY_RAW;
+
+  // Botão da barra rápida de copiar a chave telefone
+  if (directPixBtn) {
+    directPixBtn.addEventListener('click', () => {
+      copyToClipboard(PIX_KEY_RAW, '🌺 Chave PIX (13997766522) copiada com sucesso!');
+    });
+  }
+
   if (!modal) return;
 
-  // Abrir modal ao clicar em qualquer presente
   giftButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       const card = btn.closest('.gift-card');
-      const title = card ? card.querySelector('.gift-title').innerText : 'Cota de Casamento';
-      const price = card ? card.querySelector('.gift-price').innerText : 'Valor livre';
+      const icon = card ? card.querySelector('.gift-icon').innerText : '🎁';
+      const title = card ? card.querySelector('.gift-title').innerText : 'Presente de Casamento';
+      const rawPriceAttr = card ? card.getAttribute('data-price') : null;
 
-      if (modalGiftTitle) modalGiftTitle.innerText = title;
-      if (modalGiftValue) modalGiftValue.innerText = price;
-      if (pixKeyDisplay) pixKeyDisplay.innerText = `${PIX_KEY_FORMATTED} (Celular)`;
+      let numericAmount = null;
+      let displayPrice = 'Valor Livre';
 
-      // Gerar QR Code instantâneo com a chave PIX
-      if (pixQrImage) {
-        pixQrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(PIX_KEY_RAW)}`;
+      if (rawPriceAttr === 'custom') {
+        const customInput = document.getElementById('custom-gift-input');
+        const val = customInput ? parseFloat(customInput.value) : NaN;
+        if (!isNaN(val) && val > 0) {
+          numericAmount = val;
+          displayPrice = `R$ ${val.toFixed(2).replace('.', ',')}`;
+        } else {
+          displayPrice = 'Qualquer Valor (Livre)';
+        }
+      } else if (rawPriceAttr) {
+        numericAmount = parseFloat(rawPriceAttr);
+        displayPrice = card.querySelector('.gift-price')?.innerText || `R$ ${numericAmount.toFixed(2)}`;
       }
 
-      // Configurar link do WhatsApp para avisar os noivos
+      // Gera o código PIX Copia e Cola Oficial (EMV) com o valor do presente
+      currentPixPayload = generatePixCopyPaste(numericAmount);
+
+      if (modalGiftIcon) modalGiftIcon.innerText = icon;
+      if (modalGiftTitle) modalGiftTitle.innerText = title;
+      if (modalGiftValue) modalGiftValue.innerText = displayPrice;
+      if (pixKeyDisplay) pixKeyDisplay.innerText = currentPixPayload;
+
+      // Gera QR Code escaneável pelo app do banco
+      if (pixQrImage) {
+        pixQrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(currentPixPayload)}`;
+      }
+
+      // Link do WhatsApp para avisar a Maria Helena e o Breno
       if (notifyWhatsBtn) {
-        const text = encodeURIComponent(`Olá Breno e Maria Helena! Acabei de contribuir com o presente "${title}" (${price}) no site do casamento de vocês! ❤️ Parabéns!`);
+        const text = encodeURIComponent(`Olá Maria Helena e Breno! 🌺 Acabei de enviar o presente "${title}" (${displayPrice}) pelo PIX do site do casamento! Muitas felicidades para vocês! ❤️`);
         notifyWhatsBtn.href = `https://api.whatsapp.com/send?phone=${WHATSAPP_PHONE}&text=${text}`;
       }
 
@@ -133,7 +263,6 @@ function initGiftsModal() {
     });
   });
 
-  // Fechar modal
   if (modalClose) {
     modalClose.addEventListener('click', () => closeModal(modal));
   }
@@ -142,21 +271,25 @@ function initGiftsModal() {
     if (e.target === modal) closeModal(modal);
   });
 
-  // Copiar chave PIX (copia os números limpos para facilitar no app do banco)
-  if (copyPixBtn) {
-    copyPixBtn.addEventListener('click', () => {
-      navigator.clipboard.writeText(PIX_KEY_RAW).then(() => {
-        showToast(" Chave PIX copiada com sucesso!");
-        const originalText = copyPixBtn.innerHTML;
-        copyPixBtn.innerHTML = `<span>✓ Copiado!</span>`;
-        setTimeout(() => {
-          copyPixBtn.innerHTML = originalText;
-        }, 2500);
-      }).catch(() => {
-        showToast("Selecione e copie o número: " + PIX_KEY_FORMATTED);
-      });
+  if (copyPayloadBtn) {
+    copyPayloadBtn.addEventListener('click', () => {
+      copyToClipboard(currentPixPayload, '✨ Código PIX Copia e Cola copiado! Cole no app do seu banco.');
     });
   }
+
+  if (copyPhoneBtn) {
+    copyPhoneBtn.addEventListener('click', () => {
+      copyToClipboard(PIX_KEY_RAW, '📱 Chave Telefone 13997766522 copiada!');
+    });
+  }
+}
+
+function copyToClipboard(text, successMsg) {
+  navigator.clipboard.writeText(text).then(() => {
+    showToast(successMsg);
+  }).catch(() => {
+    showToast(`Copie a chave: ${PIX_KEY_FORMATTED}`);
+  });
 }
 
 function openModal(modal) {
@@ -170,14 +303,27 @@ function closeModal(modal) {
 }
 
 /* ==========================================================================
-   4. FORMULÁRIO DE RSVP (CONFIRMAÇÃO DE PRESENÇA)
+   6. FORMULÁRIO DE RSVP (CONFIRMAÇÃO DE PRESENÇA)
    ========================================================================== */
 function initRSVPForm() {
   const form = document.getElementById('rsvp-form');
+  const guestsSelect = document.getElementById('rsvp-guests');
+  const companionsWrap = document.getElementById('companions-field-wrap');
   const successModal = document.getElementById('rsvp-success-modal');
   const successClose = document.getElementById('rsvp-success-close');
 
   if (!form) return;
+
+  // Exibir campo de nome dos acompanhantes se selecionar 2 ou mais pessoas
+  if (guestsSelect && companionsWrap) {
+    guestsSelect.addEventListener('change', () => {
+      if (parseInt(guestsSelect.value, 10) > 1) {
+        companionsWrap.style.display = 'flex';
+      } else {
+        companionsWrap.style.display = 'none';
+      }
+    });
+  }
 
   // Seleção visual dos botões de rádio Sim / Não
   const radioCards = document.querySelectorAll('.radio-attendance-card');
@@ -196,6 +342,7 @@ function initRSVPForm() {
     const name = form.elements['name'] ? form.elements['name'].value.trim() : '';
     const phone = form.elements['phone'] ? form.elements['phone'].value.trim() : '';
     const guests = form.elements['guests'] ? form.elements['guests'].value : '1';
+    const companions = form.elements['companions'] ? form.elements['companions'].value.trim() : '';
     const diet = form.elements['diet'] ? form.elements['diet'].value.trim() : '';
     const attending = form.querySelector('input[name="attending"]:checked')?.value || 'sim';
 
@@ -204,34 +351,43 @@ function initRSVPForm() {
       return;
     }
 
-    // Salvar confirmação no armazenamento local (localStorage)
     const storedRSVPs = JSON.parse(localStorage.getItem('wedding_rsvps') || '[]');
     storedRSVPs.push({
       name,
       phone,
       guests,
+      companions,
       diet,
       attending,
       timestamp: new Date().toISOString()
     });
     localStorage.setItem('wedding_rsvps', JSON.stringify(storedRSVPs));
 
-    // Configurar mensagem do WhatsApp para o convidado enviar com um clique
     const whatsBtn = document.getElementById('rsvp-whatsapp-confirm');
     if (whatsBtn) {
-      const statusText = attending === 'sim' ? 'SIM, com certeza estarei lá comemorando com vocês!' : 'Infelizmente não poderei comparecer, mas desejo toda felicidade do mundo!';
-      const msg = encodeURIComponent(`Olá Breno e Maria Helena! Confirmei minha presença pelo site:\n\n*Nome:* ${name}\n*Confirmação:* ${statusText}\n*Total de pessoas:* ${guests}${diet ? `\n*Observações:* ${diet}` : ''}`);
-      whatsBtn.href = `https://api.whatsapp.com/send?phone=${WHATSAPP_PHONE}&text=${msg}`;
+      const statusText = attending === 'sim'
+        ? '🎉 SIM, estarei lá comemorando com vocês!'
+        : '😢 Infelizmente não poderei comparecer, mas desejo toda felicidade do mundo!';
+
+      let msg = `Olá Maria Helena e Breno! 🌺 Confirmei minha presença pelo site do casamento:\n\n*Nome:* ${name}\n*Status:* ${statusText}\n*Total de pessoas:* ${guests}`;
+      if (companions && parseInt(guests, 10) > 1) {
+        msg += `\n*Acompanhante(s):* ${companions}`;
+      }
+      if (diet) {
+        msg += `\n*Observações/Música:* ${diet}`;
+      }
+
+      whatsBtn.href = `https://api.whatsapp.com/send?phone=${WHATSAPP_PHONE}&text=${encodeURIComponent(msg)}`;
     }
 
-    // Abrir modal de sucesso
     if (successModal) {
       openModal(successModal);
     } else {
-      showToast('Confirmação enviada com sucesso! Obrigado.');
+      showToast('🌺 Confirmação registrada com sucesso!');
     }
 
     form.reset();
+    if (companionsWrap) companionsWrap.style.display = 'none';
   });
 
   if (successClose && successModal) {
@@ -240,7 +396,7 @@ function initRSVPForm() {
 }
 
 /* ==========================================================================
-   5. MURAL DE RECADOS
+   7. MURAL DE RECADOS
    ========================================================================== */
 function initGuestbook() {
   const form = document.getElementById('guestbook-form');
@@ -248,21 +404,19 @@ function initGuestbook() {
 
   if (!form || !container) return;
 
-  // Carregar recados salvos
-  const savedMessages = JSON.parse(localStorage.getItem('wedding_guestbook') || '[]');
-  
-  // Se não houver recados ainda, exibe recados iniciais carinhosos de exemplo
+  const savedMessages = JSON.parse(localStorage.getItem('wedding_guestbook_mb') || '[]');
+
   if (savedMessages.length === 0) {
     const initialExamples = [
       {
-        author: "Camila & Rafael (Padrinhos)",
-        date: "Ontem",
-        message: "Estamos contando os dias para esse momento mágico! Vocês merecem toda a felicidade do mundo. Amamos muito vocês!"
+        author: "Padrinhos & Amigos",
+        date: "Recente",
+        message: "Maria Helena e Breno, estamos contando os dias para celebrar esse pôr do sol inesquecível com vocês! Que Deus abençoe sempre essa união linda!"
       },
       {
-        author: "Tia Lúcia",
-        date: "Há 3 dias",
-        message: "Que Deus abençoe essa linda união hoje e para todo o sempre! Mal posso esperar para ver a noiva mais linda."
+        author: "Tia Lúcia & Família",
+        date: "Há 2 dias",
+        message: "Desde 2022 já sabíamos que vocês tinham nascido um para o outro. Que o cordão de três dobras seja sempre a base do lar de vocês!"
       }
     ];
     initialExamples.forEach(msg => renderMessage(msg, container));
@@ -291,15 +445,13 @@ function initGuestbook() {
       date: 'Agora mesmo'
     };
 
-    // Renderiza na hora no topo
     renderMessage(newMessage, container, true);
 
-    // Salva no localStorage
     savedMessages.unshift(newMessage);
-    localStorage.setItem('wedding_guestbook', JSON.stringify(savedMessages));
+    localStorage.setItem('wedding_guestbook_mb', JSON.stringify(savedMessages));
 
     form.reset();
-    showToast(' Recado publicado com carinho!');
+    showToast('🌺 Recado publicado no mural com carinho!');
   });
 }
 
@@ -343,5 +495,5 @@ function showToast(message) {
 
   setTimeout(() => {
     toast.classList.remove('show');
-  }, 3200);
+  }, 3400);
 }
