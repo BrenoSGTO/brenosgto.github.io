@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initNavbar();
   initScrollReveal();
   initCountdown();
+  initLookbookFilter();
+  initLookbookModal();
   initGiftFilters();
   initGiftsModal();
   initRSVPForm();
@@ -530,4 +532,123 @@ function showToast(message) {
   setTimeout(() => {
     toast.classList.remove('show');
   }, 3400);
+}
+
+/* ==========================================================================
+   LOOKBOOK DOS CONVIDADOS: FILTROS & MODAL LIGHTBOX INTERATIVO
+   ========================================================================== */
+function initLookbookFilter() {
+  const filterBtns = document.querySelectorAll('.lookbook-filter-btn');
+  const lookCards = document.querySelectorAll('.lookbook-card');
+
+  if (!filterBtns.length || !lookCards.length) return;
+
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const filter = btn.getAttribute('data-filter');
+
+      lookCards.forEach(card => {
+        const categories = (card.getAttribute('data-category') || '').split(' ');
+        if (filter === 'all' || categories.includes(filter)) {
+          card.classList.remove('is-hidden');
+        } else {
+          card.classList.add('is-hidden');
+        }
+      });
+    });
+  });
+}
+
+function initLookbookModal() {
+  const modal = document.getElementById('lookbook-modal');
+  if (!modal) return;
+
+  const closeBtn = document.getElementById('lookbook-modal-close');
+  const prevBtn = document.getElementById('lookbook-prev-btn');
+  const nextBtn = document.getElementById('lookbook-next-btn');
+
+  const modalImg = document.getElementById('modal-look-img');
+  const modalBadge = document.getElementById('modal-look-badge');
+  const modalTitle = document.getElementById('modal-look-title');
+  const modalCounter = document.getElementById('modal-look-counter');
+  const modalEle = document.getElementById('modal-look-ele');
+  const modalEla = document.getElementById('modal-look-ela');
+
+  let activeIndex = 0;
+  let visibleCards = [];
+
+  const updateVisibleCards = () => {
+    visibleCards = Array.from(document.querySelectorAll('.lookbook-card:not(.is-hidden)'));
+    if (!visibleCards.length) {
+      visibleCards = Array.from(document.querySelectorAll('.lookbook-card'));
+    }
+  };
+
+  const showLook = (index) => {
+    updateVisibleCards();
+    if (index < 0) index = visibleCards.length - 1;
+    if (index >= visibleCards.length) index = 0;
+    activeIndex = index;
+
+    const card = visibleCards[activeIndex];
+    if (!card) return;
+
+    const img = card.getAttribute('data-img');
+    const badge = card.getAttribute('data-badge');
+    const title = card.getAttribute('data-title');
+    const ele = card.getAttribute('data-ele');
+    const ela = card.getAttribute('data-ela');
+
+    if (modalImg) modalImg.src = img;
+    if (modalBadge) modalBadge.innerText = badge;
+    if (modalTitle) modalTitle.innerText = title;
+    if (modalCounter) modalCounter.innerText = `Inspiração ${activeIndex + 1} de ${visibleCards.length}`;
+    if (modalEle) modalEle.innerText = ele;
+    if (modalEla) modalEla.innerText = ela;
+  };
+
+  document.querySelectorAll('.lookbook-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      updateVisibleCards();
+      const idx = visibleCards.indexOf(card);
+      showLook(idx >= 0 ? idx : 0);
+      modal.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    });
+  });
+
+  const closeModal = () => {
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  if (prevBtn) {
+    prevBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showLook(activeIndex - 1);
+    });
+  }
+
+  if (nextBtn) {
+    nextBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showLook(activeIndex + 1);
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (!modal.classList.contains('active')) return;
+    if (e.key === 'Escape') closeModal();
+    if (e.key === 'ArrowLeft') showLook(activeIndex - 1);
+    if (e.key === 'ArrowRight') showLook(activeIndex + 1);
+  });
 }
